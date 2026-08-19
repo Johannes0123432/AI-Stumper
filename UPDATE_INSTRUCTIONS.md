@@ -1,38 +1,28 @@
-# How to Update Your App on Render
+# How to Update the Adaptive Edition on Render
 
-## Files you need to replace
-- `app.py`  (updated with strongest DeepSeek model + Gemini fallbacks)
+## New file
+Replace your current `app.py` with the new Adaptive Edition.
 
-## Method 1 – If you deployed from GitHub (Recommended)
+## What is new
+- **Procedural mode** now uses harder anti-memorization templates
+  (groups of order p³ with exponent restriction, discriminant of period cubic, Hilbert tower degree, etc.)
+- **Hard Adaptive mode**: asks a strong model to invent completely new traps on the fly
+- Stricter filtering against the strongest available models
+  (DeepSeek V4 Pro 0813 + current Gemini)
+- Better randomization so pure recall fails more often
 
-1. Go to your GitHub repository that Render is connected to.
-2. Replace the old `app.py` with the new one (drag & drop or upload).
-3. Commit the change (GitHub will show “Commit changes”).
-4. Go to your Render dashboard → select your Web Service.
-5. Render will automatically detect the new commit and start a new deploy.
-6. Wait 1–3 minutes until status shows **Live**.
+## Update steps on Render (GitHub method)
 
-That’s it. The new version is online.
+1. Open your GitHub repository
+2. Click on `app.py`
+3. Click the pencil icon (Edit)
+4. Delete everything and paste the full content of the new `app.py`
+5. Scroll down → Commit changes (message: "Adaptive Edition")
+6. Go to Render dashboard → your service
+7. It should auto-deploy. If not, click Manual Deploy → Deploy latest commit
+8. Wait until status is Live
 
-## Method 2 – Manual redeploy (if needed)
-
-1. Open your service on Render.
-2. Go to the **Manual Deploy** section (or the three dots menu).
-3. Click **Clear build cache & deploy** or **Deploy latest commit**.
-4. Wait for the deploy to finish.
-
-## What changed in this update
-
-- DeepSeek now uses the strongest model: `deepseek/deepseek-v4-pro-0813`
-- Automatic fallbacks if that model is unavailable
-- Gemini still uses current models (`gemini-3.6-flash` and fallbacks)
-- Better error handling
-
-## After updating
-
-Test both modes:
-- Procedural generation
-- LLM-assisted generation
-- Multi-model filter (Gemini + DeepSeek)
-
-You should no longer see the old `gemini-2.5-flash` 404 errors.
+## After update
+- Test “Procedural (fast, anti-mem)”
+- Test “Hard Adaptive (LLM invents new traps)” – needs Google key
+- Keep the filter turned on for best results
