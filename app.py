@@ -400,17 +400,24 @@ FINAL ANSWER: <same as ANSWER>
 The answer must be solely derivable from calculation inside the problem.
 """
 
-def generate_with_llm(api_key: str, model: str = "gemini-2.5-flash"):
+def generate_with_llm(api_key: str, model: str = "gemini-3.6-flash"):
     if not HAS_GENAI:
         return None, "google-genai not installed"
-    try:
-        client = genai.Client(api_key=api_key)
-        chat = client.chats.create(model=model)
-        response = chat.send_message(LLM_GENERATION_PROMPT)
-        text = response.text or ""
-        return parse_llm_output(text), None
-    except Exception as e:
-        return None, str(e)
+    models_to_try = [model, "gemini-3.6-flash", "gemini-3.7-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
+    seen = set()
+    models_to_try = [m for m in models_to_try if not (m in seen or seen.add(m))]
+    last_error = None
+    for m in models_to_try:
+        try:
+            client = genai.Client(api_key=api_key)
+            chat = client.chats.create(model=m)
+            response = chat.send_message(LLM_GENERATION_PROMPT)
+            text = response.text or ""
+            return parse_llm_output(text), None
+        except Exception as e:
+            last_error = str(e)
+            continue
+    return None, last_error or "all Gemini models failed"
 
 def parse_llm_output(text: str):
     cat = "Math"
@@ -438,33 +445,59 @@ def parse_llm_output(text: str):
 # Multi-model testing helpers
 # ============================================================
 
-def ask_gemini(api_key: str, question: str, model: str = "gemini-2.5-flash"):
+def ask_gemini(api_key: str, question: str, model: str = "gemini-3.6-flash"):
     if not HAS_GENAI or not api_key:
         return None, "no key / no library"
-    try:
-        client = genai.Client(api_key=api_key)
-        chat = client.chats.create(model=model)
-        resp = chat.send_message(
-            "Solve rigorously. Put the final answer on its own line after FINAL ANSWER:\n\n" + question
-        )
-        return resp.text or "", None
-    except Exception as e:
-        return None, str(e)
+    # Try current models in order (handles retired names automatically)
+    models_to_try = [
+        model,
+        "gemini-3.6-flash",
+        "gemini-3.7-flash",
+        "gemini-2.0-flash",
+        "gemini-1.5-flash",
+    ]
+    seen = set()
+    models_to_try = [m for m in models_to_try if not (m in seen or seen.add(m))]
+    last_error = None
+    for m in models_to_try:
+        try:
+            client = genai.Client(api_key=api_key)
+            chat = client.chats.create(model=m)
+            resp = chat.send_message(
+                "Solve rigorously. Put the final answer on its own line after FINAL ANSWER:\n\n" + question
+            )
+            return resp.text or "", None
+        except Exception as e:
+            last_error = str(e)
+            continue
+    return None, last_error or "all Gemini models failed"
 
 def ask_deepseek(api_key: str, question: str):
     if not HAS_OPENAI or not api_key:
         return None, "no key / no library"
-    try:
-        client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=api_key)
-        r = client.chat.completions.create(
-            model="deepseek/deepseek-chat",
-            messages=[{"role": "user", "content": question}],
-            temperature=0,
-            max_tokens=1200
-        )
-        return r.choices[0].message.content, None
-    except Exception as e:
-        return None, str(e)
+    # Strongest DeepSeek → fallbacks (Aug 2026)
+    models_to_try = [
+        "deepseek/deepseek-v4-pro-0813",   # strongest available
+        "deepseek/deepseek-v4-pro",
+        "deepseek/deepseek-v4-flash",
+        "deepseek/deepseek-r1",
+        "deepseek/deepseek-chat",
+    ]
+    last_error = None
+    for model in models_to_try:
+        try:
+            client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=api_key)
+            r = client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": question}],
+                temperature=0,
+                max_tokens=1200
+            )
+            return r.choices[0].message.content, None
+        except Exception as e:
+            last_error = str(e)
+            continue
+    return None, last_error or "all DeepSeek models failed"
 
 def model_failed(reply: str, gold: str) -> bool:
     if not reply:
