@@ -9,7 +9,7 @@ This is a lightweight static site that:
 
 1. Open `index.html`
 2. Replace **every** occurrence of:
-   `https://YOUR-RENDER-APP.onrender.com`
+   `https://ai-stumper.onrender.com`
    with your real Render URL
 3. Replace `https://YOUR-DOMAIN.com/` with your final domain (optional but recommended for SEO)
 
