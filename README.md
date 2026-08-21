@@ -1,78 +1,35 @@
-# Planck CURVD Stumper Generator
+# Wrapper Website for Planck Stumper Generator
 
-Public free version of the app.
+This is a lightweight static site that:
+- Is indexable by Google
+- Embeds (or links to) your Render-hosted Streamlit app
+- Can be published on a grok.me subdomain or any custom domain
 
-## Features
-- Procedural generation of CURVD stumper problems (Math & Physics)
-- Techniques to defeat pure recall (hidden dependencies, wrong-answer attractors, etc.)
-- Optional LLM-assisted generation
-- Multi-model filter (Gemini + DeepSeek)
-- Endless non-repeating problems via hash memory
-- One-click export of Planck-ready `.txt`
+## Quick start
 
-## Local run
+1. Open `index.html`
+2. Replace **every** occurrence of:
+   `https://YOUR-RENDER-APP.onrender.com`
+   with your real Render URL
+3. Replace `https://YOUR-DOMAIN.com/` with your final domain (optional but recommended for SEO)
 
-```bash
-pip install -r requirements.txt
-streamlit run app.py
-```
+## Deploy options
 
-## Deploy on Render (recommended)
+### A. Grok / xAI Build Mode (if available)
+- Upload the `wrapper_site` folder or the single `index.html`
+- Publish to a `*.grok.me` subdomain or connect a custom domain
 
-1. Create a free account at https://render.com
-2. Create a new **Web Service**
-3. Connect your GitHub repository (or upload the files)
-4. Settings:
-   - **Name**: planck-stumper (or any name)
-   - **Runtime**: Python 3
-   - **Build Command**: `pip install -r requirements.txt`
-   - **Start Command**: `streamlit run app.py --server.port $PORT --server.address 0.0.0.0`
-5. Click **Create Web Service**
-6. Wait 1–3 minutes. You will get a public URL like:
-   `https://planck-stumper.onrender.com`
+### B. Cloudflare Pages / Netlify / Vercel (free)
+1. Create a new project
+2. Upload the `wrapper_site` folder (or just `index.html`)
+3. Add your custom domain in the platform settings
 
-### Important Render notes
-- Free tier spins down after 15 min of inactivity (first request after sleep takes ~30–50 s)
-- For always-on you need a paid plan ($7/month)
+### C. GitHub Pages
+1. Create a new public repo
+2. Upload `index.html`
+3. Enable GitHub Pages in Settings → Pages
 
-## Deploy on Railway
-
-1. Go to https://railway.app and login with GitHub
-2. New Project → Deploy from GitHub repo
-3. Add the files (`app.py` + `requirements.txt`)
-4. Railway usually auto-detects Streamlit
-5. If needed, set Start Command:
-   ```
-   streamlit run app.py --server.port $PORT --server.address 0.0.0.0
-   ```
-6. Generate a public domain in the Settings tab
-
-## Environment variables (optional)
-
-You can later add:
-- `GOOGLE_API_KEY`
-- `OPENROUTER_API_KEY`
-
-in the platform’s Environment / Variables section so users don’t have to paste keys every time (or so you can provide shared keys).
-
-## Next step (payments)
-
-After the free public version is live, we will add:
-- Login system
-- Admin (you) = free forever
-- Simple license-key system **or** Stripe subscriptions
-
----
-
-Created for Project Planck stumper generation.
-
-## Feedback system (new)
-
-The app now includes an in-app rating system in the sidebar:
-
-- Star rating (1–5)
-- Optional comment
-- Optional email
-- All feedback collected during the session can be downloaded as CSV by the app owner
-
-After a user generates a few problems they are gently prompted to leave a rating.
+## SEO tips
+- Keep the title and meta description accurate
+- Once live, submit the URL in Google Search Console
+- Add a simple `sitemap.xml` pointing to the homepage if you expand later

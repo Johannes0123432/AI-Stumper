@@ -370,7 +370,7 @@ FINAL ANSWER: <same>
 def generate_adaptive(api_key: str):
     if not HAS_GENAI:
         return None, "no google-genai"
-    for m in ["gemini-3.6-flash", "gemini-3.7-flash", "gemini-2.0-flash"]:
+    for m in ["gemini-3.6-flash", "gemini-3.7-flash", "gemini-3.5-flash"]:
         try:
             client = genai.Client(api_key=api_key)
             chat = client.chats.create(model=m)
@@ -402,7 +402,7 @@ def parse_llm_output(text: str):
 
 def ask_gemini(api_key: str, question: str):
     if not HAS_GENAI or not api_key: return None, "no key"
-    for m in ["gemini-3.6-flash", "gemini-3.7-flash", "gemini-2.0-flash"]:
+    for m in ["gemini-3.6-flash", "gemini-3.7-flash", "gemini-3.5-flash"]:
         try:
             client = genai.Client(api_key=api_key)
             chat = client.chats.create(model=m)
