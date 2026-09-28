@@ -1,11 +1,8 @@
 """
-Planck CURVD Stumper Generator – PhD / Research Level
-====================================================
-- Harder multi-step (≈6 steps) problems
-- Domains: Math, Physics, Biology
-- Anti-memorization + wrong-answer attractors
-- Strict filtering against strongest models
-- Hard Adaptive mode
+AI Stumper – PhD / Research Level
+=================================
+Fast generation of hard multi-step Math, Physics, Biology problems
+designed to stump frontier LLMs. Anti-memorization + Adaptive mode.
 """
 
 import streamlit as st
@@ -29,19 +26,26 @@ try:
 except ImportError:
     HAS_OPENAI = False
 
+# ---------- Config ----------
+ADMIN_EMAIL = "johannessikoka@gmail.com"
+PAYPAL_MONTHLY_LINK = "https://www.paypal.com/cgi-bin/webscr?cmd=_xclick-subscriptions&business=johannessikoka%40gmail.com&item_name=AI%20Stumper%20Pro%20Monthly&a3=10.00&p3=1&t3=M&src=1&currency_code=USD"
+# Fallback simple PayPal.me (user can replace with real subscription button):
+PAYPAL_SIMPLE = "https://paypal.me/johannessikoka/10"
+
 # Session state
-if "seen_hashes" not in st.session_state:
-    st.session_state.seen_hashes = set()
-if "generated_count" not in st.session_state:
-    st.session_state.generated_count = 0
-if "last_problem" not in st.session_state:
-    st.session_state.last_problem = None
-if "filter_results" not in st.session_state:
-    st.session_state.filter_results = {}
-if "feedbacks" not in st.session_state:
-    st.session_state.feedbacks = []
-if "feedback_submitted" not in st.session_state:
-    st.session_state.feedback_submitted = False
+defaults = {
+    "seen_hashes": set(),
+    "generated_count": 0,
+    "last_problem": None,
+    "filter_results": {},
+    "feedbacks": [],
+    "user_email": "",
+    "is_admin": False,
+    "is_pro": False,
+}
+for k, v in defaults.items():
+    if k not in st.session_state:
+        st.session_state[k] = v
 
 def problem_hash(q: str, a: str) -> str:
     return hashlib.sha256((q.strip() + "|||" + a.strip()).encode()).hexdigest()
@@ -234,12 +238,8 @@ def gen_physics_instanton():
 
 
 def gen_bio_moran():
-    """Weak-selection fixation probability expansion – classic attractor is neutral 1/N."""
     N = random.choice([20, 30, 50, 100])
     seed = random.randrange(10**9)
-    # Under weak selection the fixation probability of a rare advantageous mutant is
-    # ≈ (1/N) + (s/2)(1 − 1/N) + O(s²) for birth-death Moran; the leading correction coefficient is often asked.
-    # We ask for the neutral fixation probability itself but force a multi-step derivation.
     question = (
         f"In the Moran process on a well-mixed population of size N = {N}, "
         f"what is the fixation probability of a single neutral mutant? "
@@ -293,7 +293,6 @@ def gen_bio_replicator():
         f"Answer with the standard name (one word or short phrase)."
     )
     answer = "Hawk-Dove"
-    # More precisely "anti-coordination" or "Hawk-Dove / snowdrift", but we take the classic name.
     golden = (
         f"SEED = {seed}\n"
         f"STEP 1: Write the payoff matrix [[a,b],[c,d]].\n"
@@ -311,18 +310,11 @@ def gen_bio_replicator():
 
 def gen_procedural():
     gens = [
-        gen_math_p3_exponent,
-        gen_math_discriminant,
-        gen_math_hilbert_tower,
-        gen_math_order,
-        gen_physics_recoil,
-        gen_physics_dof,
-        gen_physics_instanton,
-        gen_bio_moran,
-        gen_bio_sir_hopf,
-        gen_bio_replicator,
+        gen_math_p3_exponent, gen_math_discriminant, gen_math_hilbert_tower, gen_math_order,
+        gen_physics_recoil, gen_physics_dof, gen_physics_instanton,
+        gen_bio_moran, gen_bio_sir_hopf, gen_bio_replicator,
     ]
-    for _ in range(40):
+    for _ in range(20):
         prob = random.choice(gens)()
         if is_novel(prob["question"], prob["answer"]):
             return prob
@@ -330,28 +322,15 @@ def gen_procedural():
 
 
 # ============================================================
-# Adaptive LLM generation
+# Adaptive LLM generation (used only when requested)
 # ============================================================
 
 ADAPTIVE_PROMPT = """You are an expert designer of PhD-level problems that stump frontier LLMs.
-
 Create ONE original, self-contained problem in Math, Physics or Biology that requires approximately six reasoning steps.
-
-CURVD requirements:
-- Exact unique short answer
-- Fully self-contained
-- Solvable by a careful human without a computer
-- Answer solely from the given information
-
-Mandatory techniques (use ≥3):
-- Hidden critical dependency
-- Strong wrong-answer attractor
-- Inverse or restricted formulation
-- Fresh parameters
-
+CURVD requirements: Exact unique short answer, fully self-contained, solvable by a careful human without a computer.
+Mandatory techniques (use ≥3): Hidden critical dependency, Strong wrong-answer attractor, Inverse or restricted formulation, Fresh parameters.
 Output format ONLY:
-
-CATEGORY: Math   or   Physics   or   Biology
+CATEGORY: Math or Physics or Biology
 QUESTION:
 <problem statement>
 ANSWER:
@@ -370,7 +349,8 @@ FINAL ANSWER: <same>
 def generate_adaptive(api_key: str):
     if not HAS_GENAI:
         return None, "no google-genai"
-    for m in ["gemini-3.6-flash", "gemini-3.7-flash", "gemini-3.5-flash"]:
+    last = "unknown"
+    for m in ["gemini-3.6-flash", "gemini-3.7-flash"]:
         try:
             client = genai.Client(api_key=api_key)
             chat = client.chats.create(model=m)
@@ -396,13 +376,11 @@ def parse_llm_output(text: str):
             "techniques": ["adaptive invention", "hidden dependency", "attractor"], "seed": random.randrange(10**9)}
 
 
-# ============================================================
-# Model callers
-# ============================================================
-
 def ask_gemini(api_key: str, question: str):
-    if not HAS_GENAI or not api_key: return None, "no key"
-    for m in ["gemini-3.6-flash", "gemini-3.7-flash", "gemini-3.5-flash"]:
+    if not HAS_GENAI or not api_key:
+        return None, "no key"
+    last = "unknown"
+    for m in ["gemini-3.6-flash", "gemini-3.7-flash"]:
         try:
             client = genai.Client(api_key=api_key)
             chat = client.chats.create(model=m)
@@ -414,13 +392,18 @@ def ask_gemini(api_key: str, question: str):
 
 
 def ask_deepseek(api_key: str, question: str):
-    if not HAS_OPENAI or not api_key: return None, "no key"
-    for model in ["deepseek/deepseek-v4-pro-0813", "deepseek/deepseek-v4-pro",
-                  "deepseek/deepseek-v4-flash", "deepseek/deepseek-r1", "deepseek/deepseek-chat"]:
+    if not HAS_OPENAI or not api_key:
+        return None, "no key"
+    last = "unknown"
+    for model in ["deepseek/deepseek-v4-flash", "deepseek/deepseek-chat"]:
         try:
             client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=api_key)
-            r = client.chat.completions.create(model=model, messages=[{"role":"user","content":question}],
-                                               temperature=0, max_tokens=1000)
+            r = client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": question}],
+                temperature=0,
+                max_tokens=600,
+            )
             return r.choices[0].message.content, None
         except Exception as e:
             last = str(e)
@@ -428,15 +411,19 @@ def ask_deepseek(api_key: str, question: str):
 
 
 def model_failed(reply: str, gold: str) -> bool:
-    if not reply: return True
+    if not reply:
+        return True
     clean = re.sub(r"[^a-zA-Z0-9\\/\-\.]", "", reply.lower())
     gold_clean = re.sub(r"[^a-zA-Z0-9\\/\-\.]", "", str(gold).lower())
-    if gold_clean in clean: return False
+    if gold_clean in clean:
+        return False
     try:
         g = float(gold)
         for n in re.findall(r"-?\d+\.?\d*", reply):
-            if abs(float(n) - g) < 1e-6: return False
-    except: pass
+            if abs(float(n) - g) < 1e-6:
+                return False
+    except Exception:
+        pass
     return True
 
 
@@ -444,57 +431,92 @@ def model_failed(reply: str, gold: str) -> bool:
 # UI
 # ============================================================
 
-st.set_page_config(page_title="Planck PhD Stumper Generator", layout="wide")
-st.title("Planck PhD / Research-Level Stumper Generator")
-st.caption("Math • Physics • Biology • ≈6-step trajectories • Anti-memorization • Adaptive mode")
+st.set_page_config(page_title="AI Stumper", layout="wide", initial_sidebar_state="expanded")
+st.title("AI Stumper")
+st.caption("PhD-level Math • Physics • Biology stumpers • Fast procedural + Adaptive mode")
 
 with st.sidebar:
-    st.header("Mode")
-    gen_mode = st.radio("Generation mode", [
-        "Procedural (PhD templates)",
-        "Hard Adaptive (LLM invents new traps)",
-    ], index=0)
+    st.header("Access")
+    email_in = st.text_input("Your email", value=st.session_state.user_email, placeholder="you@example.com")
+    if email_in != st.session_state.user_email:
+        st.session_state.user_email = email_in.strip().lower()
+        st.session_state.is_admin = (st.session_state.user_email == ADMIN_EMAIL.lower())
+        st.session_state.is_pro = st.session_state.is_admin
+
+    if st.session_state.is_admin:
+        st.success("Admin access — free forever")
+        st.session_state.is_pro = True
+    else:
+        st.info("Free tier: procedural generation")
+        st.markdown("**Upgrade to Pro — $10 / month**")
+        st.markdown(f"[Pay with PayPal ($10/month)]({PAYPAL_MONTHLY_LINK})")
+        st.caption("After payment, email the receipt to get full access (or contact admin).")
+        # Simple manual unlock for paid users (admin can tell them a phrase)
+        unlock = st.text_input("Pro unlock code (optional)", type="password")
+        if unlock.strip().lower() in ("pro2026", "aistumper-pro"):
+            st.session_state.is_pro = True
+            st.success("Pro unlocked")
+
     st.markdown("---")
-    use_filter = st.checkbox("Only keep problems that fail models", value=True)
-    min_failures = st.slider("Min models that must fail", 1, 2, 1)
+    st.header("Mode")
+    modes = ["Procedural (fast)"]
+    if st.session_state.is_pro or st.session_state.is_admin:
+        modes.append("Hard Adaptive (LLM invents traps)")
+    gen_mode = st.radio("Generation mode", modes, index=0)
+
+    st.markdown("---")
+    # Filter OFF by default for speed
+    use_filter = st.checkbox("Filter: only keep problems models fail", value=False)
+    min_failures = 1
+    if use_filter:
+        min_failures = st.slider("Min models that must fail", 1, 2, 1)
+
     st.markdown("---")
     google_key = st.text_input("Google AI Studio key", type="password")
     openrouter_key = st.text_input("OpenRouter key", type="password")
+
     st.markdown("---")
-    st.write(f"Generated: **{st.session_state.generated_count}**")
+    st.write(f"Generated this session: **{st.session_state.generated_count}**")
     if st.button("Clear hash memory"):
         st.session_state.seen_hashes = set()
         st.success("Cleared")
 
     st.markdown("---")
-    st.subheader("Rate this app")
+    st.subheader("Feedback")
     with st.form("fb", clear_on_submit=True):
         rating = st.feedback("stars")
         comment = st.text_area("Comment", max_chars=300, height=60)
-        email = st.text_input("Email (optional)")
         if st.form_submit_button("Submit"):
             if rating is not None:
                 st.session_state.feedbacks.append({
-                    "timestamp": datetime.utcnow().isoformat()+"Z",
-                    "rating": int(rating)+1, "comment": comment, "email": email
+                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                    "rating": int(rating) + 1,
+                    "comment": comment,
+                    "email": st.session_state.user_email,
                 })
                 st.success("Thanks!")
-    if st.session_state.feedbacks:
-        buf = io.StringIO()
-        csv.DictWriter(buf, fieldnames=["timestamp","rating","comment","email"]).writeheader()
-        csv.DictWriter(buf, fieldnames=["timestamp","rating","comment","email"]).writerows(st.session_state.feedbacks)
-        st.download_button("Download feedbacks", buf.getvalue(), "feedbacks.csv", "text/csv")
 
-if st.button("Generate new stumper", type="primary", use_container_width=True):
-    with st.spinner("Generating hard 6-step problem + filtering…"):
+# Free tier soft limit (admin unlimited)
+FREE_LIMIT = 8
+can_generate = True
+if not st.session_state.is_admin and not st.session_state.is_pro:
+    if st.session_state.generated_count >= FREE_LIMIT:
+        can_generate = False
+        st.warning(f"Free tier limit ({FREE_LIMIT} per session) reached. Upgrade to Pro ($10/month) for unlimited access.")
+        st.markdown(f"[Pay with PayPal — $10/month]({PAYPAL_MONTHLY_LINK})")
+
+if can_generate and st.button("Generate new stumper", type="primary", use_container_width=True):
+    with st.spinner("Generating…"):
         kept = None
         log = []
-        for attempt in range(12):
+        max_attempts = 4 if use_filter else 1   # much faster
+
+        for attempt in range(max_attempts):
             if gen_mode.startswith("Procedural"):
                 cand = gen_procedural()
             else:
                 if not google_key:
-                    st.error("Adaptive mode needs Google key")
+                    st.error("Adaptive mode needs a Google AI Studio key")
                     break
                 cand, err = generate_adaptive(google_key)
                 if err or not cand:
@@ -506,14 +528,17 @@ if st.button("Generate new stumper", type="primary", use_container_width=True):
             failures = 0
             results = {}
             if use_filter:
-                if google_key:
-                    reply, err = ask_gemini(google_key, cand["question"])
-                    results["gemini"] = "ERROR" if err else ("FAILED" if model_failed(reply, cand["answer"]) else "SOLVED")
-                    if results["gemini"] == "FAILED": failures += 1
+                # Prefer one model first for speed
                 if openrouter_key:
                     reply, err = ask_deepseek(openrouter_key, cand["question"])
                     results["deepseek"] = "ERROR" if err else ("FAILED" if model_failed(reply, cand["answer"]) else "SOLVED")
-                    if results["deepseek"] == "FAILED": failures += 1
+                    if results["deepseek"] == "FAILED":
+                        failures += 1
+                elif google_key:
+                    reply, err = ask_gemini(google_key, cand["question"])
+                    results["gemini"] = "ERROR" if err else ("FAILED" if model_failed(reply, cand["answer"]) else "SOLVED")
+                    if results["gemini"] == "FAILED":
+                        failures += 1
                 if failures >= min_failures:
                     kept = cand
                     st.session_state.filter_results = results
@@ -522,22 +547,24 @@ if st.button("Generate new stumper", type="primary", use_container_width=True):
                     log.append(f"Attempt {attempt+1}: {failures} failures")
             else:
                 kept = cand
+                st.session_state.filter_results = {}
                 break
 
         if kept:
             st.session_state.last_problem = kept
             st.session_state.generated_count += 1
-            st.success(f"Kept after {attempt+1} attempts")
+            st.success("Ready")
         else:
-            st.warning("No survivor this run. Try again.")
+            st.warning("No problem kept this run. Try again (or turn filter off for speed).")
             if log:
                 with st.expander("Log"):
-                    for l in log: st.text(l)
+                    for line in log:
+                        st.text(line)
 
 if st.session_state.last_problem:
     p = st.session_state.last_problem
-    st.markdown("### Ready for Planck")
-    c1, c2 = st.columns([3,1])
+    st.markdown("### Ready to submit")
+    c1, c2 = st.columns([3, 1])
     with c1:
         st.markdown(f"**Category:** `{p['category']}`")
         st.markdown("**Question**")
@@ -549,19 +576,29 @@ if st.session_state.last_problem:
             st.code(p["golden"])
     with c2:
         st.markdown("**Techniques**")
-        for t in p.get("techniques", []): st.write("• "+t)
+        for t in p.get("techniques", []):
+            st.write("• " + t)
         st.write(f"Seed: `{p.get('seed')}`")
         if st.session_state.filter_results:
             st.markdown("**Filter**")
-            for m,s in st.session_state.filter_results.items():
+            for m, s in st.session_state.filter_results.items():
                 st.write(f"{m}: **{s}**")
 
-    export = (f"CATEGORY: {p['category']}\n\nQUESTION:\n{p['question']}\n\n"
-              f"ANSWER:\n{p['answer']}\n\nGOLDEN TRAJECTORY:\n(leave empty on first trial)\n\n"
-              f"--- later ---\n{p['golden']}\n")
-    st.download_button("Download Planck-ready .txt", export,
-                       f"planck_{p.get('seed')}.txt", "text/plain", use_container_width=True)
+    export = (
+        f"CATEGORY: {p['category']}\n\nQUESTION:\n{p['question']}\n\n"
+        f"ANSWER:\n{p['answer']}\n\nGOLDEN TRAJECTORY:\n(leave empty on first trial)\n\n"
+        f"--- later ---\n{p['golden']}\n"
+    )
+    st.download_button(
+        "Download ready .txt",
+        export,
+        f"ai_stumper_{p.get('seed')}.txt",
+        "text/plain",
+        use_container_width=True,
+    )
 
 st.markdown("---")
-st.caption("PhD-level generators in Math, Physics and Biology with explicit 6-step golden trajectories. "
-           "Anti-memorization design + adaptive invention mode + strongest-model filtering.")
+st.caption(
+    "AI Stumper — fast PhD-level stumpers for Math, Physics & Biology. "
+    "Admin free access for johannessikoka@gmail.com. Pro: $10/month via PayPal."
+)
